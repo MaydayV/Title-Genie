@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+env/
+.env
+
+# Streamlit
+.streamlit/
+
+# Local configuration & Data
+.title_genie_config.json
+title_history.json
+*.xlsx
+*.csv
+*.json
+
+# Docs (Ignore all except instructions)
+*.md
+!BUILD_INSTRUCTIONS.md
+!README.md
+!requirements.txt
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
