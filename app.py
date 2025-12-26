@@ -6,7 +6,14 @@ from dotenv import load_dotenv
 from utils.file_handler import load_file, export_excel
 from utils.prompt_builder import build_prompt
 from utils.text_gen import generate_text
-from utils.validator import validate_brand, check_duplication, calculate_seo_score
+from utils.text_gen import generate_text
+from utils.validator import (
+    validate_brand, 
+    check_duplication, 
+    calculate_seo_score, 
+    fix_acronyms, 
+    remove_filler_words
+)
 
 # Load environment variables
 load_dotenv()
@@ -190,6 +197,7 @@ def main():
                     status_text.markdown(f"**正在处理 ({index + 1}/{total_rows})**: `{main_kw_display}`")
                     
                     # Build Prompt
+                    role_instruction = "Role: You are an Alibaba International Station SEO expert specializing in high-converting product titles for global markets."
                     prompt = build_prompt(row, selected_mode, extra_context=performance_context)
                     full_prompt = f"{prompt}\n\nTask: Generate {num_titles} distinct, professional titles for this product. Output them as a numbered list (1. Title...)."
                     
@@ -206,6 +214,10 @@ def main():
                         
                         clean_title = re.sub(r'^\d+\.?\s*', '', line)
                         if len(clean_title) < 10: continue
+
+                        # 0. Post-AI Cleanup & Normalization
+                        clean_title = remove_filler_words(clean_title)
+                        clean_title = fix_acronyms(clean_title)
 
                         # 1. Brand Validation
                         clean_title, fixed = validate_brand(clean_title, row.get('Brand', ''))
@@ -236,6 +248,46 @@ def main():
                             row.get('Core Keyword', '')
                         )
                         
+                        # --- AI Polishing Loop (Self-Correction) ---
+                        attempts = 0
+                        max_attempts = 2
+                        while seo_score < 100 and attempts < max_attempts:
+                            attempts += 1
+                            polish_prompt = f"""
+{role_instruction}
+The following title needs optimization to reach a perfect SEO score (100).
+Current Title: "{clean_title}"
+Current Character Count: {len(clean_title)}
+REQUIRED Character Count: 80 - 120 (STRICT HARD LIMIT: DO NOT EXCEED 120)
+Faults Identified: {seo_notes}
+Mandatory Keywords: "{row.get('Brand', '')}", "{row.get('Main Keyword', '')}", "{row.get('Core Keyword', '')}"
+
+Task: Rewrite the title to fix all faults. 
+If it's too long, you MUST REMOVE non-essential descriptive words or specifications.
+The new title MUST:
+1. Start with "{row.get('Brand', '')} {row.get('Main Keyword', '')}"
+2. Include "{row.get('Core Keyword', '')}"
+3. Be between 80 - 120 characters total.
+Output ONLY the new title.
+"""
+                            polished_title = generate_text(polish_prompt, api_key_input, model_name).strip()
+                            polished_title = re.sub(r'^["\']|["\']$', '', polished_title) # Remove quotes
+                            
+                            # Re-Validate
+                            new_score, new_notes = calculate_seo_score(
+                                polished_title, 
+                                row.get('Brand', ''), 
+                                row.get('Main Keyword', ''), 
+                                row.get('Core Keyword', '')
+                            )
+                            
+                            if new_score >= seo_score:
+                                clean_title = polished_title
+                                seo_score = new_score
+                                seo_notes = f"[Polished V{attempts}] {new_notes}"
+                                if seo_score == 100:
+                                    break
+
                         result_row = {
                             "原行号 (Row ID)": index + 1,
                             "品牌 (Brand)": row.get('Brand', ''),

@@ -54,22 +54,34 @@ def calculate_seo_score(title, brand, main_kw, core_kw):
     # Penalize deviations
     length = len(title)
     if length < 80:
-        penalty = (80 - length) * 1 # Lose 1 pt per char under
+        penalty = min(20, (80 - length) * 1) # Lose 1 pt per char under, max 20
         score -= penalty
         reasons.append(f"太短 (-{penalty})")
     elif length > 120:
-        penalty = (length - 120) * 2 # Lose 2 pts per char over (stricter)
+        penalty = min(50, (length - 120) * 3) # Even stricter: 3 pts per char over, max 50
         score -= penalty
-        reasons.append(f"太长 (-{penalty})")
+        reasons.append(f"太长({length}/120) (-{penalty})")
         
     # 2. Keyword Check
+    def contains_kw(text, kw):
+        if not kw or pd.isna(kw): return True
+        # Normalize: remove non-alphanumeric for matching
+        norm_text = re.sub(r'[^a-z0-9]', '', text.lower())
+        norm_kw = re.sub(r'[^a-z0-9]', '', str(kw).lower())
+        return norm_kw in norm_text
+
     # Brand
-    if str(brand).lower() not in title.lower():
+    if not contains_kw(title, brand):
         score -= 20
         reasons.append("缺品牌 (-20)")
         
+    # Main Keyword
+    if not contains_kw(title, main_kw):
+        score -= 20
+        reasons.append("缺主词 (-20)")
+        
     # Core Keyword
-    if str(core_kw).lower() not in title.lower():
+    if not contains_kw(title, core_kw):
         score -= 15
         reasons.append("缺核心词 (-15)")
         
@@ -84,6 +96,51 @@ def calculate_seo_score(title, brand, main_kw, core_kw):
     if title and title[0].islower():
         score -= 5
         reasons.append("首字母未大写 (-5)")
+
+    # 5. Redundancy Check (Repeated phrases)
+    words = re.findall(r'\b\w+\b', title.lower())
+    
+    # Extract all words from keywords to ignore them
+    kw_text = f"{brand} {main_kw} {core_kw}".lower()
+    kw_words = set(re.findall(r'\b\w+\b', kw_text))
+    
+    seen_words = set()
+    repeated = []
+    for w in words:
+        if len(w) > 3 and w in seen_words and w not in kw_words:
+            repeated.append(w)
+        seen_words.add(w)
+    
+    if repeated:
+        unique_repeated = list(set(repeated))
+        penalty = len(unique_repeated) * 7
+        score -= penalty
+        reasons.append(f"含重复词 {unique_repeated} (-{penalty})")
     
     # Floor score at 0
     return max(0, score), ", ".join(reasons)
+
+def fix_acronyms(title):
+    """
+    Ensures common industry acronyms are always uppercase.
+    """
+    acronyms = [
+        "POS", "LCD", "LED", "CPU", "RAM", "OS", "USB", "QR", "RFID", "VPC", 
+        "NFC", "GPRS", "4G", "5G", "LTE", "SDK", "API", "OEM", "ODM", "IP", "IOS", "ANDROID"
+    ]
+    for ac in acronyms:
+        # Match case-insensitively but replace with uppercase if it's a whole word
+        pattern = re.compile(r'\b' + re.escape(ac) + r'\b', re.IGNORECASE)
+        title = pattern.sub(ac, title)
+    return title
+
+def remove_filler_words(title):
+    """
+    Removes common starting filler words that waste character count.
+    """
+    fillers = ["The ", "A ", "An ", "the ", "a ", "an "]
+    for f in fillers:
+        if title.startswith(f):
+            title = title[len(f):]
+            break
+    return title

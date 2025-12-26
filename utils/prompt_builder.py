@@ -33,46 +33,54 @@ Examples of BAD Titles (Do NOT do this):
 2. Wireless Earbuds by TechNova with Bluetooth 5.0 Headphones (Repetitive, boring structure)
 """
 
-    role_instruction = "Role: You are an Alibaba International Station SEO expert. Your goal is to write high-converting product titles."
+    role_instruction = "Role: You are an Alibaba International Station SEO expert specializing in high-converting product titles for global markets."
 
     constraints = """
-CRITICAL CONSTRAINTS (Must Follow):
-1. **Length**: 80 - 120 characters limits.
-2. **Keywords**: strictly include "{brand}", "{main_kw}", and "{core_kw}".
-3. **SEO Front-Loading**: Place the most important keywords ({brand} + {core_kw}) within the **first 60 characters**.
+CRITICAL CONSTRAINTS (Strict Compliance Required):
+1. **Length**: 80 - 120 characters limits. **THIS IS A HARD LIMIT. IF THE TITLE EXCEEDS 120 CHARACTERS, IT WILL FAIL. PRUNE SPECIFICATIONS IF NECESSARY.**
+2. **Mandatory Keywords**: strictly include "{brand}", "{main_kw}", and "{core_kw}".
+3. **SEO Front-Loading**: The title MUST start with "{brand} {main_kw}". This is non-negotiable for brand recognition and SEO.
 4. **Format**: 
     - Capitalize First Letters (Title Case). 
-    - **ACRONYMS**: Always uppercase standard acronyms (e.g., POS, LED, LCD, CPU). Do NOT write 'Pos' or 'Led'.
+    - **ACRONYMS**: Always uppercase standard acronyms (e.g., POS, LED, LCD, CPU, RAM, OS).
 5. **Readability**: 
-    - **NO Redundancy**: If "{main_kw}" and "{core_kw}" imply the same thing (e.g. "Desktop POS" and "POS Solutions"), merge them naturally. Do NOT say "Desktop POS POS Solutions".
-    - **Fluidity**: Make it read like a sentence, not a robot list. Use prepositions.
-    - **Separators**: Use `-` or `|` sparingly (max 1-2 times).
-6. **Logic**: Do NOT just concatenate. Make it readable.
+    - **NO Redundancy**: Do not repeat the same keyword phrase twice unless used in a different context.
+    - **Fluidity**: Use natural English flow. Incorporate market-specific adjectives and synonyms to extend the title naturally.
+    - **Separators**: Use `-` or `|` only to separate distinct thought blocks.
 """.format(brand=brand, main_kw=main_kw, core_kw=core_kw)
 
     if mode == "Mode A": # Strict
         strategy = f"""
 Strategy: STRICT STRUCTURE
-Structure: [Brand] + [Key Specs/Attributes] + [Core Keyword] + [Main Keyword Integration]
+Structure: [Brand] + [Main Keyword] + [Key Specs/Attributes] + [Core Keyword]
 Context:
 {context_str}
 
 Task: Generate title strictly following the structure above.
 """
-    else: # Mode B: Natural - UPDATED
+    else: # Mode B: Natural & Commercial
         strategy = f"""
-Strategy: NATURAL & COMMERCIAL
-Target Audience: Native English speakers (US/EU).
-Goal: Maximize Click-Through Rate (CTR).
-Context:
+Strategy: COMMERCIAL & CONVERSATIONAL
+Target Audience: Global B2B buyers seeking professional product solutions.
+Context (Use these variables to enrich the title):
 {context_str}
 
 {few_shot_examples}
 
 Instruction:
-1. Analyze the 'Context' to find the most attractive selling points (e.g. material, application, certifications).
-2. Combine "{brand}", "{main_kw}", and "{core_kw}" with those selling points into a fluid, grammatically correct sentence.
-3. Use benefits to persuade the buyer (e.g. "for Retail", "High efficiency").
+1. Start exactly with "{brand} {main_kw}".
+2. Integrate "{core_kw}" and other key attributes (like product model, CPU, OS, etc. from context) naturally.
+3. **DIVERSITY**: When generating multiple titles, ensure each title focuses on a DIFFERENT aspect:
+    - Title 1: Focus on Technical Specs & Performance.
+    - Title 2: Focus on Application Scenarios (e.g., Retail, Kitchen, Warehouse).
+    - Title 3: Focus on User Benefits (e.g., Productivity, Error-reduction, Durability).
+    - Title 4: Focus on Design & Material.
+    - Title 5: Focus on Market Keywords & Commercial Appeal.
+4. Use commercial synonyms (e.g., "Advanced", "Smart", "Efficient", "Industrial-grade") to improve appeal.
+5. Ensure the total length is between 80-120 characters.
+6. Make it sound like a premium product listing, not a keyword list.
 """
+
+    return f"{role_instruction}\n{constraints}\n{strategy}"
 
     return f"{role_instruction}\n{constraints}\n{strategy}"
