@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 import os
 import re
+import json
+import time
 from dotenv import load_dotenv
 from utils.file_handler import load_file, export_excel
 from utils.prompt_builder import build_prompt
-from utils.text_gen import generate_text
 from utils.text_gen import generate_text
 from utils.validator import (
     validate_brand, 
@@ -14,15 +15,13 @@ from utils.validator import (
     fix_acronyms, 
     remove_filler_words
 )
+from utils.title_history import TitleHistoryManager
 
 # Load environment variables
 load_dotenv()
 
 # --- Helper Functions for Config Persistence ---
 CONFIG_FILE = ".title_genie_config.json"
-import json
-import time
-from utils.title_history import TitleHistoryManager
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
