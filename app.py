@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from utils.file_handler import load_file, export_excel
 from utils.prompt_builder import build_prompt
 from utils.text_gen import generate_text
+from utils.validator import (
     validate_brand, 
     check_duplication, 
     calculate_seo_score, 
