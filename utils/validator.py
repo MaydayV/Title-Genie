@@ -2,6 +2,27 @@ import difflib
 import pandas as pd
 import re
 
+def remove_punctuation(title):
+    """
+    Removes forbidden punctuation (commas, periods, exclamations, question marks).
+    Keeps hyphens (-) and ampersands (&) as they are valid separators.
+    """
+    # Remove commas, periods, exclamation marks, question marks, semicolons, colons
+    # Both English and Chinese punctuation
+    title = re.sub(r'[,，。.!！?？;；:：]', ' ', title)
+    # Collapse multiple spaces
+    title = re.sub(r'\s+', ' ', title).strip()
+    return title
+
+def check_punctuation(title):
+    """
+    Checks if forbidden punctuation exists in the title.
+    Returns: (bool has_punctuation, list forbidden_chars_found)
+    """
+    # Find all occurrences of forbidden punctuation
+    forbidden = re.findall(r'[,，。.!！?？;；:：]', title)
+    return len(forbidden) > 0, list(set(forbidden))
+
 def validate_brand(title, brand):
     """
     Ensures the Brand is present in the title. 
@@ -117,6 +138,13 @@ def calculate_seo_score(title, brand, main_kw, core_kw):
         score -= penalty
         reasons.append(f"含重复词 {unique_repeated} (-{penalty})")
     
+    
+    # 6. Punctuation Check (Strict No-Comma Policy)
+    has_punct, punct_list = check_punctuation(title)
+    if has_punct:
+        score -= 10
+        reasons.append(f"含禁止标点{punct_list} (-10)")
+
     # Floor score at 0
     return max(0, score), ", ".join(reasons)
 

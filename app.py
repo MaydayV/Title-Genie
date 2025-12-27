@@ -8,12 +8,12 @@ from dotenv import load_dotenv
 from utils.file_handler import load_file, export_excel
 from utils.prompt_builder import build_prompt
 from utils.text_gen import generate_text
-from utils.validator import (
     validate_brand, 
     check_duplication, 
     calculate_seo_score, 
     fix_acronyms, 
-    remove_filler_words
+    remove_filler_words,
+    remove_punctuation
 )
 from utils.title_history import TitleHistoryManager
 
@@ -83,6 +83,25 @@ def main():
             index=0, # Default to qwen-flash
             help="推荐使用 qwen-flash 以获得最快的生成速度。"
         )
+
+        # Keyword Positioning
+        st.divider()
+        st.subheader("📍 关键词位置设置")
+        pos_options = ["前 (Front)", "中 (Middle)", "尾 (End)"]
+        
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            brand_pos = st.selectbox("品牌词", pos_options, index=0, key="pos_brand")
+        with col_p2:
+            main_kw_pos = st.selectbox("主词", pos_options, index=0, key="pos_main")
+        with col_p3:
+            core_kw_pos = st.selectbox("核心词", pos_options, index=2, key="pos_core")
+
+        keyword_positions = {
+            "Brand": brand_pos,
+            "Main Keyword": main_kw_pos,
+            "Core Keyword": core_kw_pos
+        }
 
         # Strategy Selection
         st.subheader("生成策略设置")
@@ -163,6 +182,24 @@ def main():
             processed_count = len(st.session_state['processed_indices'])
             total_rows = len(df)
             
+            # --- Starred Fields Selection ---
+            st.divider()
+            st.subheader("⭐ 星标字段设置")
+            st.caption("选择最多2个字段，其内容将强制包含在标题中（可AI优化）。")
+            
+            # Exclude mandatory keywords from selection
+            exclude_keywords = ['Brand', 'Main Keyword', 'Core Keyword', 'Generated Titles', 'Original Row ID']
+            available_star_cols = [c for c in df.columns if c not in exclude_keywords and c.strip() != '']
+            
+            starred_fields = st.multiselect(
+                "选择星标字段 (最多2个)",
+                options=available_star_cols,
+                max_selections=2,
+                key="starred_fields_select",
+                help="所选字段的内容会被加入提示词，要求AI必须体现在标题中。"
+            )
+
+            
             # --- Generation Trigger ---
             btn_label = "开始生成标题" if processed_count == 0 else f"继续生成 (已完成 {processed_count}/{total_rows})"
             
@@ -197,7 +234,13 @@ def main():
                     
                     # Build Prompt
                     role_instruction = "Role: You are an Alibaba International Station SEO expert specializing in high-converting product titles for global markets."
-                    prompt = build_prompt(row, selected_mode, extra_context=performance_context)
+                    prompt = build_prompt(
+                        row, 
+                        selected_mode, 
+                        extra_context=performance_context,
+                        keyword_positions=keyword_positions,
+                        starred_fields=starred_fields
+                    )
                     full_prompt = f"{prompt}\n\nTask: Generate {num_titles} distinct, professional titles for this product. Output them as a numbered list (1. Title...)."
                     
                     # Call API
@@ -215,6 +258,7 @@ def main():
                         if len(clean_title) < 10: continue
 
                         # 0. Post-AI Cleanup & Normalization
+                        clean_title = remove_punctuation(clean_title)  # Remove commas/periods FIRST
                         clean_title = remove_filler_words(clean_title)
                         clean_title = fix_acronyms(clean_title)
 
