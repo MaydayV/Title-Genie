@@ -4,8 +4,6 @@ import os
 import re
 import json
 import time
-from dotenv import load_dotenv
-from streamlit_local_storage import LocalStorage
 from utils.file_handler import load_file, export_excel
 from utils.prompt_builder import build_prompt
 from utils.text_gen import generate_text
@@ -19,15 +17,23 @@ from utils.validator import (
 )
 from utils.title_history import TitleHistoryManager
 
-# Load environment variables
+# Load environment variables (Local dev)
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass
 
-# Initialize browser localStorage
-localStorage = LocalStorage()
+# Initialize browser localStorage (Optional)
+class MockLocalStorage:
+    def getItem(self, key): return None
+    def setItem(self, key, value): pass
+
+try:
+    from streamlit_local_storage import LocalStorage
+    localStorage = LocalStorage()
+except ImportError:
+    localStorage = MockLocalStorage()
 
 # --- Helper Functions for Config Persistence (Browser LocalStorage) ---
 LOCAL_STORAGE_KEY = "title_genie_config"
