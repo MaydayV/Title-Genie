@@ -54,8 +54,8 @@ def main():
     # Load config from browser localStorage
     local_config = load_config_from_browser()
 
-    # Initialize History Manager
-    history_manager = TitleHistoryManager()
+    # Initialize History Manager with browser localStorage
+    history_manager = TitleHistoryManager(local_storage=localStorage)
 
     # --- Sidebar Configuration ---
     with st.sidebar:

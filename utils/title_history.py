@@ -1,5 +1,6 @@
 """
 Title History Manager - Manages historical title database for cross-library deduplication.
+Supports both file-based storage (local) and browser localStorage (cloud).
 """
 
 import json
@@ -8,28 +9,46 @@ import difflib
 from datetime import datetime
 from typing import List, Tuple, Optional
 
-# Default path for the history file
+# Default path for the history file (used for local development)
 DEFAULT_HISTORY_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "title_history.json")
+
+# LocalStorage key for browser storage
+LOCALSTORAGE_KEY = "title_genie_history"
 
 
 class TitleHistoryManager:
     """
     Manages a persistent store of generated titles for cross-library deduplication.
+    Supports both file-based storage and browser localStorage.
     """
     
-    def __init__(self, history_path: str = None):
+    def __init__(self, history_path: str = None, local_storage=None):
         """
-        Initialize the manager with a path to the history file.
+        Initialize the manager.
         
         Args:
-            history_path: Path to the JSON file storing title history.
+            history_path: Path to the JSON file storing title history (for local dev).
+            local_storage: LocalStorage instance for browser storage (for cloud/web).
         """
         self.history_path = history_path or DEFAULT_HISTORY_PATH
+        self.local_storage = local_storage
         self.titles: List[dict] = []
         self.load_history()
     
     def load_history(self) -> None:
-        """Load title history from JSON file."""
+        """Load title history from storage (browser localStorage or file)."""
+        # Try browser localStorage first
+        if self.local_storage:
+            try:
+                data = self.local_storage.getItem(LOCALSTORAGE_KEY)
+                if data:
+                    parsed = json.loads(data) if isinstance(data, str) else data
+                    self.titles = parsed.get('titles', [])
+                    return
+            except Exception:
+                pass
+        
+        # Fallback to file-based storage
         if os.path.exists(self.history_path):
             try:
                 with open(self.history_path, 'r', encoding='utf-8') as f:
@@ -41,16 +60,26 @@ class TitleHistoryManager:
             self.titles = []
     
     def save_history(self) -> None:
-        """Save title history to JSON file."""
+        """Save title history to storage (browser localStorage or file)."""
+        data = {
+            'last_updated': datetime.now().isoformat(),
+            'total_count': len(self.titles),
+            'titles': self.titles
+        }
+        
+        # Try browser localStorage first
+        if self.local_storage:
+            try:
+                self.local_storage.setItem(LOCALSTORAGE_KEY, json.dumps(data, ensure_ascii=False))
+                return  # Success, no need to try file
+            except Exception:
+                pass
+        
+        # Fallback to file-based storage
         try:
-            data = {
-                'last_updated': datetime.now().isoformat(),
-                'total_count': len(self.titles),
-                'titles': self.titles
-            }
             with open(self.history_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-        except (IOError, OSError, PermissionError) as e:
+        except (IOError, OSError, PermissionError):
             # Silently handle errors (e.g., read-only filesystem on Streamlit Cloud)
             pass
     
@@ -126,8 +155,8 @@ class TitleHistoryManager:
         """Get statistics about the title history."""
         return {
             'total_titles': len(self.titles),
-            'history_path': self.history_path,
-            'file_exists': os.path.exists(self.history_path)
+            'storage_mode': 'browser' if self.local_storage else 'file',
+            'history_path': self.history_path if not self.local_storage else 'localStorage'
         }
     
     def import_from_csv(self, file_path: str, title_column: str = 'title') -> int:
