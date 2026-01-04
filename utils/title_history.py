@@ -50,8 +50,9 @@ class TitleHistoryManager:
             }
             with open(self.history_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-        except IOError as e:
-            print(f"Warning: Could not save title history: {e}")
+        except (IOError, OSError, PermissionError) as e:
+            # Silently handle errors (e.g., read-only filesystem on Streamlit Cloud)
+            pass
     
     def add_title(self, title: str, brand: str = "", product_id: str = "") -> None:
         """

@@ -24,21 +24,37 @@ load_dotenv()
 # --- Helper Functions for Config Persistence ---
 CONFIG_FILE = ".title_genie_config.json"
 
+def is_cloud_environment():
+    """Check if running on Streamlit Cloud (read-only filesystem)"""
+    # Streamlit Cloud sets this env var
+    return os.getenv("STREAMLIT_SHARING_MODE") is not None or os.getenv("STREAMLIT_RUNTIME_ENV") == "cloud"
+
 def load_config():
+    # On cloud, use session state only
+    if is_cloud_environment():
+        return st.session_state.get('_local_config', {})
+    
     if os.path.exists(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, 'r') as f:
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return {}
 
 def save_config(config):
+    # Always save to session state
+    st.session_state['_local_config'] = config
+    
+    # On cloud, skip file write
+    if is_cloud_environment():
+        return
+    
     try:
-        with open(CONFIG_FILE, 'w') as f:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
             json.dump(config, f)
-    except:
-        pass
+    except Exception:
+        pass  # Silently fail on permission errors
 
 st.set_page_config(page_title="Title Genie 标题精灵", page_icon="🧞", layout="wide")
 
@@ -58,8 +74,15 @@ def main():
         
         # API Key Management
         if 'api_key' not in st.session_state:
-            # Try env var first, then local config
-            env_key = os.getenv("DASHSCOPE_API_KEY", "")
+            # Priority: Streamlit secrets > env var > local config
+            env_key = ""
+            try:
+                # Try Streamlit secrets first (for Cloud deployment)
+                env_key = st.secrets.get("DASHSCOPE_API_KEY", "")
+            except Exception:
+                pass
+            if not env_key:
+                env_key = os.getenv("DASHSCOPE_API_KEY", "")
             st.session_state['api_key'] = env_key if env_key else local_config.get("api_key", "")
             
         api_key_input = st.text_input(
