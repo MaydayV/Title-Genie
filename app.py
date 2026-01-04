@@ -52,104 +52,134 @@ def main():
     st.markdown("阿里国际站标题自动化生成工具")
 
     # Load config from browser localStorage
+    # local_config = load_config_from_browser() # This line is moved inside main() and show_settings_dialog()
+
+    # Initialize History Manager with browser localStorage
+    # history_manager = TitleHistoryManager(local_storage=localStorage) # This line is moved inside main()
+
+@st.dialog("⚙️ 设置 (Configuration)", width="large")
+def show_settings_dialog(history_manager):
+    # API Key Management
+    local_config = load_config_from_browser()
+    
+    st.subheader("🔑 API 设置")
+    api_key_input = st.text_input(
+        "DashScope API Key (通义千问)", 
+        value=st.session_state.get('api_key', ''),
+        type="password",
+        help="请从阿里云 DashScope 控制台获取 API Key",
+        key="api_key_dialog"
+    )
+    
+    # Update session state & auto-save to browser localStorage on change
+    if api_key_input != st.session_state.get('api_key'):
+        st.session_state['api_key'] = api_key_input
+        local_config["api_key"] = api_key_input
+        save_config_to_browser(local_config)
+        st.toast("API Key 已保存", icon="💾")
+
+    # Model Selection
+    model_name = st.selectbox(
+        "选择模型 (Model)",
+        options=["qwen-flash", "qwen-plus", "qwen-turbo", "qwen-max"],
+        index=["qwen-flash", "qwen-plus", "qwen-turbo", "qwen-max"].index(st.session_state.get('model_name', 'qwen-flash')),
+        help="推荐使用 qwen-flash 以获得最快的生成速度。",
+        key="model_dialog"
+    )
+    st.session_state['model_name'] = model_name
+
+    # Keyword Positioning
+    st.divider()
+    st.subheader("📍 关键词位置设置")
+    pos_options = ["前 (Front)", "中 (Middle)", "尾 (End)"]
+    
+    col_p1, col_p2, col_p3 = st.columns(3)
+    with col_p1:
+        st.session_state['pos_brand'] = st.selectbox("品牌词", pos_options, 
+                                                    index=pos_options.index(st.session_state.get('pos_brand', "前 (Front)")), 
+                                                    key="brand_pos_dialog")
+    with col_p2:
+        st.session_state['pos_main'] = st.selectbox("主词", pos_options, 
+                                                   index=pos_options.index(st.session_state.get('pos_main', "前 (Front)")), 
+                                                   key="main_pos_dialog")
+    with col_p3:
+        st.session_state['pos_core'] = st.selectbox("核心词", pos_options, 
+                                                   index=pos_options.index(st.session_state.get('pos_core', "尾 (End)")), 
+                                                   key="core_pos_dialog")
+
+    # Strategy Selection
+    st.divider()
+    st.subheader("🤖 生成策略设置")
+    mode_index = 1 if st.session_state.get('selected_mode_label', "Mode B (营销模式)") == "Mode B (营销模式)" else 0
+    mode = st.radio(
+        "选择生成模式",
+        ("Mode A (严格模式)", "Mode B (营销模式)"),
+        index=mode_index,
+        help="选择 'Mode A' 进行严格格式化，或选择 'Mode B' 以获得更好的点击率。",
+        key="mode_dialog"
+    )
+    st.session_state['selected_mode_label'] = mode
+    
+    # Generation Count
+    num_titles = st.slider("每个产品生成标题数量", 1, 10, st.session_state.get('num_titles', 5), key="num_titles_dialog")
+    st.session_state['num_titles'] = num_titles
+
+    # History Management
+    st.divider()
+    st.subheader("🔍 历史库管理")
+    stats = history_manager.get_stats()
+    st.caption(f"当前历史库已有标题: {stats['total_titles']} 条")
+    if st.button("清除历史库 (Clear History)", type="secondary", key="clear_history_dialog"):
+            history_manager.clear_history()
+            history_manager.save_history()
+            st.toast("历史库已清空")
+            st.rerun()
+
+def main():
+    # Header with Settings button
+    col_title, col_settings = st.columns([8, 1])
+    with col_title:
+        st.title("🧞 Title Genie 标题精灵 (Beta)")
+        st.markdown("阿里国际站标题自动化生成工具")
+    with col_settings:
+        st.write("") # Padding
+        if st.button("⚙️ 设置", use_container_width=True):
+            show_settings_dialog(history_manager)
+
+    # Initialize session state defaults if not present
+    if 'model_name' not in st.session_state: st.session_state['model_name'] = "qwen-flash"
+    if 'pos_brand' not in st.session_state: st.session_state['pos_brand'] = "前 (Front)"
+    if 'pos_main' not in st.session_state: st.session_state['pos_main'] = "前 (Front)"
+    if 'pos_core' not in st.session_state: st.session_state['pos_core'] = "尾 (End)"
+    if 'selected_mode_label' not in st.session_state: st.session_state['selected_mode_label'] = "Mode B (营销模式)"
+    if 'num_titles' not in st.session_state: st.session_state['num_titles'] = 5
+
+    # Load config from browser localStorage for initial API key
     local_config = load_config_from_browser()
 
     # Initialize History Manager with browser localStorage
     history_manager = TitleHistoryManager(local_storage=localStorage)
 
-    # --- Sidebar Configuration ---
-    with st.sidebar:
-        st.header("设置 (Configuration)")
-        
-        # API Key Management
-        if 'api_key' not in st.session_state:
-            # Priority: Streamlit secrets > env var > local config
-            env_key = ""
-            try:
-                # Try Streamlit secrets first (for Cloud deployment)
-                env_key = st.secrets.get("DASHSCOPE_API_KEY", "")
-            except Exception:
-                pass
-            if not env_key:
-                env_key = os.getenv("DASHSCOPE_API_KEY", "")
-            st.session_state['api_key'] = env_key if env_key else local_config.get("api_key", "")
-            
-        api_key_input = st.text_input(
-            "DashScope API Key (通义千问)", 
-            value=st.session_state['api_key'],
-            type="password",
-            help="请从阿里云 DashScope 控制台获取 API Key",
-            key="api_key_input"
-        )
-        # Update session state & auto-save to browser localStorage on change
-        if api_key_input != st.session_state['api_key']:
-            st.session_state['api_key'] = api_key_input
-            local_config["api_key"] = api_key_input
-            save_config_to_browser(local_config)
-            st.toast("API Key 已保存到浏览器", icon="💾")
-        
-        # Model Selection
-        st.subheader("模型设置")
-        model_name = st.selectbox(
-            "选择模型 (Model)",
-            options=["qwen-flash", "qwen-plus", "qwen-turbo", "qwen-max"],
-            index=0, # Default to qwen-flash
-            help="推荐使用 qwen-flash 以获得最快的生成速度。"
-        )
+    # API Key Initial Sync
+    if 'api_key' not in st.session_state:
+        env_key = ""
+        try:
+            env_key = st.secrets.get("DASHSCOPE_API_KEY", "")
+        except Exception: pass
+        if not env_key:
+            env_key = os.getenv("DASHSCOPE_API_KEY", "")
+        st.session_state['api_key'] = env_key if env_key else local_config.get("api_key", "")
 
-        # Keyword Positioning
-        st.divider()
-        st.subheader("📍 关键词位置设置")
-        pos_options = ["前 (Front)", "中 (Middle)", "尾 (End)"]
-        
-        col_p1, col_p2, col_p3 = st.columns(3)
-        with col_p1:
-            brand_pos = st.selectbox("品牌词", pos_options, index=0, key="pos_brand")
-        with col_p2:
-            main_kw_pos = st.selectbox("主词", pos_options, index=0, key="pos_main")
-        with col_p3:
-            core_kw_pos = st.selectbox("核心词", pos_options, index=2, key="pos_core")
-
-        keyword_positions = {
-            "Brand": brand_pos,
-            "Main Keyword": main_kw_pos,
-            "Core Keyword": core_kw_pos
-        }
-
-        # Strategy Selection
-        st.subheader("生成策略设置")
-        with st.expander("ℹ️ 策略说明指南"):
-            st.markdown("""
-            **模式 A (严格合规模式):**
-            - **适用场景:** 标准化产品目录，对格式要求严格。
-            - **逻辑:** 严格遵循 `品牌 + 规格/属性 + 核心词` 的排序结构。
-            
-            **模式 B (高点击/营销模式):**
-            - **适用场景:** 追求高点击率 (CTR) 和营销效果。
-            - **逻辑:** 让 AI 在保留必选关键词的前提下，发挥创意编写符合母语习惯、更有吸引力的标题。
-            """)
-            
-        mode = st.radio(
-            "选择生成模式",
-            ("Mode A (严格模式)", "Mode B (营销模式)"),
-            index=1,
-            help="选择 'Mode A' 进行严格格式化，或选择 'Mode B' 以获得更好的点击率。"
-        )
-        selected_mode = "Mode A" if "Mode A" in mode else "Mode B"
-        
-        # Generation Count
-        num_titles = st.slider("每个产品生成标题数量", 1, 10, 5)
-
-        # History Management
-        st.divider()
-        st.subheader("🔍 历史库管理")
-        stats = history_manager.get_stats()
-        st.caption(f"当前历史库已有标题: {stats['total_titles']} 条")
-        if st.button("清除历史库 (Clear History)", type="secondary"):
-             history_manager.clear_history()
-             history_manager.save_history()
-             st.toast("历史库已清空")
-             st.rerun()
+    # Derived values for logic
+    keyword_positions = {
+        "Brand": st.session_state['pos_brand'],
+        "Main Keyword": st.session_state['pos_main'],
+        "Core Keyword": st.session_state['pos_core']
+    }
+    selected_mode = "Mode A" if "Mode A" in st.session_state['selected_mode_label'] else "Mode B"
+    num_titles = st.session_state['num_titles']
+    api_key_input = st.session_state['api_key']
+    model_name = st.session_state['model_name']
 
     # --- Main Content ---
     
