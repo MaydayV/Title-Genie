@@ -20,7 +20,11 @@ from utils.validator import (
 from utils.title_history import TitleHistoryManager
 
 # Load environment variables
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 # Initialize browser localStorage
 localStorage = LocalStorage()
