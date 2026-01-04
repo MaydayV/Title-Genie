@@ -5,6 +5,7 @@ import re
 import json
 import time
 from dotenv import load_dotenv
+from streamlit_local_storage import LocalStorage
 from utils.file_handler import load_file, export_excel
 from utils.prompt_builder import build_prompt
 from utils.text_gen import generate_text
@@ -21,40 +22,28 @@ from utils.title_history import TitleHistoryManager
 # Load environment variables
 load_dotenv()
 
-# --- Helper Functions for Config Persistence ---
-CONFIG_FILE = ".title_genie_config.json"
+# Initialize browser localStorage
+localStorage = LocalStorage()
 
-def is_cloud_environment():
-    """Check if running on Streamlit Cloud (read-only filesystem)"""
-    # Streamlit Cloud sets this env var
-    return os.getenv("STREAMLIT_SHARING_MODE") is not None or os.getenv("STREAMLIT_RUNTIME_ENV") == "cloud"
+# --- Helper Functions for Config Persistence (Browser LocalStorage) ---
+LOCAL_STORAGE_KEY = "title_genie_config"
 
-def load_config():
-    # On cloud, use session state only
-    if is_cloud_environment():
-        return st.session_state.get('_local_config', {})
-    
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception:
-            pass
+def load_config_from_browser():
+    """Load config from browser localStorage"""
+    try:
+        data = localStorage.getItem(LOCAL_STORAGE_KEY)
+        if data:
+            return json.loads(data) if isinstance(data, str) else data
+    except Exception:
+        pass
     return {}
 
-def save_config(config):
-    # Always save to session state
-    st.session_state['_local_config'] = config
-    
-    # On cloud, skip file write
-    if is_cloud_environment():
-        return
-    
+def save_config_to_browser(config):
+    """Save config to browser localStorage"""
     try:
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(config, f)
+        localStorage.setItem(LOCAL_STORAGE_KEY, json.dumps(config))
     except Exception:
-        pass  # Silently fail on permission errors
+        pass
 
 st.set_page_config(page_title="Title Genie 标题精灵", page_icon="🧞", layout="wide")
 
@@ -62,8 +51,8 @@ def main():
     st.title("🧞 Title Genie 标题精灵 (Beta)")
     st.markdown("阿里国际站标题自动化生成工具")
 
-    # Load local config
-    local_config = load_config()
+    # Load config from browser localStorage
+    local_config = load_config_from_browser()
 
     # Initialize History Manager
     history_manager = TitleHistoryManager()
@@ -92,12 +81,12 @@ def main():
             help="请从阿里云 DashScope 控制台获取 API Key",
             key="api_key_input"
         )
-        # Update session state & auto-save to local config on change
+        # Update session state & auto-save to browser localStorage on change
         if api_key_input != st.session_state['api_key']:
             st.session_state['api_key'] = api_key_input
             local_config["api_key"] = api_key_input
-            save_config(local_config)
-            st.toast("API Key 已保存", icon="💾")
+            save_config_to_browser(local_config)
+            st.toast("API Key 已保存到浏览器", icon="💾")
         
         # Model Selection
         st.subheader("模型设置")
