@@ -170,15 +170,23 @@ def main():
     # Initialize History Manager with browser localStorage
     history_manager = TitleHistoryManager(local_storage=localStorage)
 
-    # API Key Initial Sync
-    if 'api_key' not in st.session_state:
-        env_key = ""
-        try:
-            env_key = st.secrets.get("DASHSCOPE_API_KEY", "")
-        except Exception: pass
-        if not env_key:
-            env_key = os.getenv("DASHSCOPE_API_KEY", "")
-        st.session_state['api_key'] = env_key if env_key else local_config.get("api_key", "")
+    # API Key Initial Sync (Browser -> Session State)
+    if 'api_key' not in st.session_state or not st.session_state['api_key']:
+        # 1. Try browser storage
+        saved_key = local_config.get("api_key", "")
+        if saved_key:
+            st.session_state['api_key'] = saved_key
+            st.toast("已从浏览器自动加载 API Key", icon="🔐")
+        else:
+            # 2. Try Secrets / ENV
+            env_key = ""
+            try:
+                env_key = st.secrets.get("DASHSCOPE_API_KEY", "")
+            except Exception: pass
+            if not env_key:
+                env_key = os.getenv("DASHSCOPE_API_KEY", "")
+            if env_key:
+                st.session_state['api_key'] = env_key
 
     # Derived values for logic
     keyword_positions = {
