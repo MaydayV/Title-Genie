@@ -154,6 +154,12 @@ def main():
         header {visibility: hidden;}
         footer {visibility: hidden;}
         .stAppDeployButton {display:none;}
+        .block-container {
+            max-width: 1100px;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            margin: auto;
+        }
         </style>
         """,
         unsafe_allow_html=True
