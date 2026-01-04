@@ -146,7 +146,13 @@ def show_settings_dialog(history_manager):
             st.rerun()
 
 def main():
-    # Header with Settings button
+    # 1. Load config from browser localStorage early
+    local_config = load_config_from_browser()
+
+    # 2. Initialize History Manager early
+    history_manager = TitleHistoryManager(local_storage=localStorage)
+
+    # 3. Handle Header with Settings button
     col_title, col_settings = st.columns([8, 1])
     with col_title:
         st.title("🧞 Title Genie 标题精灵 (Beta)")
@@ -156,7 +162,7 @@ def main():
         if st.button("⚙️ 设置", use_container_width=True):
             show_settings_dialog(history_manager)
 
-    # Initialize session state defaults if not present
+    # 4. Initialize session state defaults
     if 'model_name' not in st.session_state: st.session_state['model_name'] = "qwen-flash"
     if 'pos_brand' not in st.session_state: st.session_state['pos_brand'] = "前 (Front)"
     if 'pos_main' not in st.session_state: st.session_state['pos_main'] = "前 (Front)"
@@ -164,13 +170,7 @@ def main():
     if 'selected_mode_label' not in st.session_state: st.session_state['selected_mode_label'] = "Mode B (营销模式)"
     if 'num_titles' not in st.session_state: st.session_state['num_titles'] = 5
 
-    # Load config from browser localStorage for initial API key
-    local_config = load_config_from_browser()
-
-    # Initialize History Manager with browser localStorage
-    history_manager = TitleHistoryManager(local_storage=localStorage)
-
-    # API Key Initial Sync (Browser -> Session State)
+    # 5. API Key Initial Sync (Browser -> Session State)
     if 'api_key' not in st.session_state or not st.session_state['api_key']:
         # 1. Try browser storage
         saved_key = local_config.get("api_key", "")
@@ -185,8 +185,9 @@ def main():
             except Exception: pass
             if not env_key:
                 env_key = os.getenv("DASHSCOPE_API_KEY", "")
-            if env_key:
-                st.session_state['api_key'] = env_key
+            
+            # 3. Final default to empty string
+            st.session_state['api_key'] = env_key if env_key else ""
 
     # Derived values for logic
     keyword_positions = {
