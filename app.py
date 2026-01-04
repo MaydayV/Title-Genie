@@ -146,6 +146,19 @@ def show_settings_dialog(history_manager):
             st.rerun()
 
 def main():
+    # 0. Hide default Streamlit elements for a cleaner UI
+    st.markdown(
+        """
+        <style>
+        #MainMenu {visibility: hidden;}
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+        .stAppDeployButton {display:none;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # 1. Load config from browser localStorage early
     local_config = load_config_from_browser()
 
